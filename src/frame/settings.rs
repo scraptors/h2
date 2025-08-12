@@ -222,7 +222,6 @@ impl ExperimentalSettingsBuilder {
     }
 }
 
-
 #[derive(Clone, Default, Eq, PartialEq)]
 pub struct Settings {
     flags: SettingsFlags,
@@ -359,7 +358,6 @@ impl Settings {
     }
 
     pub fn load(head: Head, payload: &[u8]) -> Result<Settings, Error> {
-
         debug_assert_eq!(head.kind(), crate::frame::Kind::Settings);
 
         if !head.stream_id().is_zero() {
@@ -708,7 +706,7 @@ mod test {
         assert_eq!(order.ids[0], SettingId::HeaderTableSize);
         assert_ne!(order.ids[1], SettingId::HeaderTableSize);
     }
-    
+
     #[cfg(feature = "unstable")]
     #[test]
     fn test_experimental_settings_builder() {
@@ -741,4 +739,3 @@ mod test {
         assert_eq!(unknown.settings.len(), 1);
     }
 }
-

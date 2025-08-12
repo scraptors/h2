@@ -137,12 +137,12 @@
 
 use crate::codec::{Codec, SendError, UserError};
 use crate::ext::Protocol;
- #[cfg(feature = "unstable")]
- use crate::frame::ExperimentalSettings;
- use crate::frame::{
-     Headers, Priorities, Pseudo, PseudoOrder, Reason, Settings, SettingsOrder, StreamDependency,
-     StreamId,
- };
+#[cfg(feature = "unstable")]
+use crate::frame::ExperimentalSettings;
+use crate::frame::{
+    Headers, Priorities, Pseudo, PseudoOrder, Reason, Settings, SettingsOrder, StreamDependency,
+    StreamId,
+};
 use crate::proto::{self, Error};
 use crate::{FlowControl, PingPong, RecvStream, SendStream};
 
@@ -1186,7 +1186,6 @@ impl Builder {
         self.settings.set_no_rfc7540_priorities(enabled);
         self
     }
-
 
     /// Sets the order of settings parameters in the initial SETTINGS frame.
     ///

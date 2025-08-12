@@ -133,7 +133,6 @@ impl Send {
         self.send_priority_and_headers(None, frame, buffer, stream, counts, task)
     }
 
-
     pub fn send_priority_and_headers<B>(
         &mut self,
         priority_frame: Option<Priorities>,

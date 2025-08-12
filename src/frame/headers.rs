@@ -9,7 +9,6 @@ use http::{uri, HeaderMap, Method, Request, StatusCode, Uri};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use smallvec::SmallVec;
 
-
 use std::fmt;
 use std::io::Cursor;
 
@@ -1128,10 +1127,10 @@ fn decoded_header_size(name: usize, value: usize) -> usize {
 
 #[cfg(test)]
 mod test {
-    use std::iter::FromIterator;
     use super::*;
     use crate::frame;
     use crate::hpack::{huffman, Encoder};
+    use std::iter::FromIterator;
 
     #[test]
     fn test_nameless_header_at_resume() {

@@ -2,7 +2,6 @@ use crate::frame::*;
 use bytes::BufMut;
 use smallvec::SmallVec;
 
-
 /// The PRIORITY frame (type=0x2) specifies the sender-advised priority
 /// of a stream [Section 5.3].  It can be sent in any stream state,
 /// including idle or closed streams.
@@ -11,11 +10,10 @@ use smallvec::SmallVec;
 pub struct Priority {
     /// The stream ID of the stream that this priority frame is for
     stream_id: StreamId,
- 
+
     /// The stream dependency target
     dependency: StreamDependency,
 }
-
 
 /// Represents a stream dependency in HTTP/2 priority frames.
 ///
