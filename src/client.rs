@@ -137,7 +137,12 @@
 
 use crate::codec::{Codec, SendError, UserError};
 use crate::ext::Protocol;
-use crate::frame::{Headers, Pseudo, Reason, Settings, StreamId};
+ #[cfg(feature = "unstable")]
+ use crate::frame::ExperimentalSettings;
+ use crate::frame::{
+     Headers, Priorities, Pseudo, PseudoOrder, Reason, Settings, SettingsOrder, StreamDependency,
+     StreamId,
+ };
 use crate::proto::{self, Error};
 use crate::{FlowControl, PingPong, RecvStream, SendStream};
 
@@ -343,6 +348,15 @@ pub struct Builder {
     ///
     /// When this gets exceeded, we issue GOAWAYs.
     local_max_error_reset_streams: Option<usize>,
+
+    /// The headers frame pseudo order
+    headers_pseudo_order: Option<PseudoOrder>,
+
+    /// The headers frame stream dependency
+    headers_stream_dependency: Option<StreamDependency>,
+
+    /// Priority stream list
+    priorities: Option<Priorities>,
 }
 
 #[derive(Debug)]
@@ -663,6 +677,9 @@ impl Builder {
             settings: Default::default(),
             stream_id: 1.into(),
             local_max_error_reset_streams: Some(proto::DEFAULT_LOCAL_RESET_COUNT_MAX),
+            headers_pseudo_order: None,
+            headers_stream_dependency: None,
+            priorities: None,
         }
     }
 
@@ -1156,6 +1173,81 @@ impl Builder {
         self
     }
 
+    /// Sets the enable connect protocol.
+    pub fn enable_connect_protocol(&mut self, enabled: bool) -> &mut Self {
+        self.settings
+            .set_enable_connect_protocol(Some(enabled as _));
+        self
+    }
+
+    /// Disable RFC 7540 Stream Priorities (set to `true` to disable).
+    /// [RFC 9218]: <https://www.rfc-editor.org/rfc/rfc9218.html#section-2.1>
+    pub fn no_rfc7540_priorities(&mut self, enabled: bool) -> &mut Self {
+        self.settings.set_no_rfc7540_priorities(enabled);
+        self
+    }
+
+
+    /// Sets the order of settings parameters in the initial SETTINGS frame.
+    ///
+    /// This determines the order in which settings are sent during the HTTP/2 handshake.
+    /// Customizing the order may be useful for testing or protocol compliance.
+    pub fn settings_order(&mut self, order: SettingsOrder) -> &mut Self {
+        self.settings.set_settings_order(order);
+        self
+    }
+
+    /// Configures custom experimental HTTP/2 setting.
+    ///
+    /// This setting is reserved for future use or experimental purposes.
+    /// Enabling or disabling it may have no effect unless explicitly supported
+    /// by the server or client implementation.
+    //
+    // - Experimental feature – subject to removal without notice
+    #[cfg(feature = "unstable")]
+    pub fn experimental_settings(
+        &mut self,
+        experimental_settings: ExperimentalSettings,
+    ) -> &mut Self {
+        self.settings
+            .set_experimental_settings(experimental_settings);
+        self
+    }
+
+    /// Sets the HTTP/2 pseudo-header field order for outgoing HEADERS frames.
+    ///
+    /// This determines the order in which pseudo-header fields (such as `:method`, `:scheme`, etc.)
+    /// are encoded in the HEADERS frame. Customizing the order may be useful for interoperability
+    /// or testing purposes.
+    pub fn headers_pseudo_order(&mut self, order: PseudoOrder) -> &mut Self {
+        self.headers_pseudo_order = Some(order.into());
+        self
+    }
+
+    /// Sets the stream dependency and weight for the outgoing HEADERS frame.
+    ///
+    /// This configures the priority of the stream by specifying its dependency and weight,
+    /// as defined by the HTTP/2 priority mechanism. This can be used to influence how the
+    /// server allocates resources to this stream relative to others.
+    pub fn headers_stream_dependency(&mut self, stream_dependency: StreamDependency) -> &mut Self {
+        self.headers_stream_dependency = Some(stream_dependency);
+        self
+    }
+
+    /// Sets the list of PRIORITY frames to be sent immediately after the connection is established,
+    /// but before the first request is sent.
+    ///
+    /// This allows you to pre-configure the HTTP/2 stream dependency tree by specifying a set of
+    /// PRIORITY frames that will be sent as part of the connection preface. This can be useful for
+    /// optimizing resource allocation or testing custom stream prioritization strategies.
+    ///
+    /// Each `Priority` in the list must have a valid (non-zero) stream ID. Any priority with a
+    /// stream ID of zero will be ignored.
+    pub fn priorities(&mut self, priorities: Priorities) -> &mut Self {
+        self.priorities = Some(priorities);
+        self
+    }
+
     /// Creates a new configured HTTP/2 client backed by `io`.
     ///
     /// It is expected that `io` already be in an appropriate state to commence
@@ -1335,6 +1427,9 @@ where
                 remote_reset_stream_max: builder.pending_accept_reset_stream_max,
                 local_error_reset_streams_max: builder.local_max_error_reset_streams,
                 settings: builder.settings.clone(),
+                headers_pseudo_order: builder.headers_pseudo_order,
+                headers_stream_dependency: builder.headers_stream_dependency,
+                priorities: builder.priorities,
             },
         );
         let send_request = SendRequest {
@@ -1590,6 +1685,8 @@ impl Peer {
         request: Request<()>,
         protocol: Option<Protocol>,
         end_of_stream: bool,
+        pseudo_order: Option<PseudoOrder>,
+        headers_stream_dependency: Option<StreamDependency>,
     ) -> Result<Headers, SendError> {
         use http::request::Parts;
 
@@ -1609,6 +1706,11 @@ impl Peer {
         // Build the set pseudo header set. All requests will include `method`
         // and `path`.
         let mut pseudo = Pseudo::request(method, uri, protocol);
+
+        // If the pseudo order is set, then set the pseudo order
+        if let Some(pseudo_order) = pseudo_order {
+            pseudo.set_pseudo_order(pseudo_order);
+        }
 
         if pseudo.scheme.is_none() {
             // If the scheme is not set, then there are a two options.
@@ -1640,6 +1742,10 @@ impl Peer {
 
         // Create the HEADERS frame
         let mut frame = Headers::new(id, pseudo, headers);
+
+        if let Some(stream_dep) = headers_stream_dependency {
+            frame.set_stream_dependency(stream_dep);
+        }
 
         if end_of_stream {
             frame.set_end_stream()

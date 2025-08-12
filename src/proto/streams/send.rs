@@ -3,7 +3,7 @@ use super::{
     StreamIdOverflow, WindowSize,
 };
 use crate::codec::UserError;
-use crate::frame::{self, Reason};
+use crate::frame::{self, Priorities, Reason};
 use crate::proto::{self, Error, Initiator};
 
 use bytes::Buf;
@@ -130,12 +130,19 @@ impl Send {
         counts: &mut Counts,
         task: &mut Option<Waker>,
     ) -> Result<(), UserError> {
-        tracing::trace!(
-            "send_headers; frame={:?}; init_window={:?}",
-            frame,
-            self.init_window_sz
-        );
+        self.send_priority_and_headers(None, frame, buffer, stream, counts, task)
+    }
 
+
+    pub fn send_priority_and_headers<B>(
+        &mut self,
+        priority_frame: Option<Priorities>,
+        frame: frame::Headers,
+        buffer: &mut Buffer<Frame<B>>,
+        stream: &mut store::Ptr,
+        counts: &mut Counts,
+        task: &mut Option<Waker>,
+    ) -> Result<(), UserError> {
         Self::check_headers(frame.fields())?;
 
         let end_stream = frame.is_end_stream();
@@ -148,6 +155,26 @@ impl Send {
             self.prioritize.queue_open(stream);
             pending_open = true;
         }
+
+        // Queue the priority frame if it exists
+        if let Some(priority_frames) = priority_frame {
+            for priority_frame in priority_frames {
+                tracing::trace!(
+                    "send_priority; frame={:?}; init_window={:?}",
+                    priority_frame,
+                    self.init_window_sz
+                );
+
+                self.prioritize
+                    .queue_frame(priority_frame.into(), buffer, stream, task);
+            }
+        }
+
+        tracing::trace!(
+            "send_headers; frame={:?}; init_window={:?}",
+            frame,
+            self.init_window_sz
+        );
 
         // Queue the frame for sending
         //

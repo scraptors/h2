@@ -1,5 +1,5 @@
 use crate::codec::UserError;
-use crate::frame::{Reason, StreamId};
+use crate::frame::{Priorities, PseudoOrder, Reason, StreamDependency, StreamId};
 use crate::{client, server};
 
 use crate::frame::DEFAULT_INITIAL_WINDOW_SIZE;
@@ -83,6 +83,9 @@ pub(crate) struct Config {
     pub remote_reset_stream_max: usize,
     pub local_error_reset_streams_max: Option<usize>,
     pub settings: frame::Settings,
+    pub headers_pseudo_order: Option<PseudoOrder>,
+    pub headers_stream_dependency: Option<StreamDependency>,
+    pub priorities: Option<Priorities>,
 }
 
 #[derive(Debug)]
@@ -123,6 +126,9 @@ where
                     .max_concurrent_streams()
                     .map(|max| max as usize),
                 local_max_error_reset_streams: config.local_error_reset_streams_max,
+                headers_stream_dependency: config.headers_stream_dependency,
+                headers_pseudo_order: config.headers_pseudo_order.clone(),
+                priorities: config.priorities.clone(),
             }
         }
         let streams = Streams::new(streams_config(&config));
