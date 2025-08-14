@@ -1187,15 +1187,6 @@ impl Builder {
         self
     }
 
-    /// Sets the order of settings parameters in the initial SETTINGS frame.
-    ///
-    /// This determines the order in which settings are sent during the HTTP/2 handshake.
-    /// Customizing the order may be useful for testing or protocol compliance.
-    pub fn settings_order(&mut self, order: SettingsOrder) -> &mut Self {
-        self.settings.set_settings_order(order);
-        self
-    }
-
     /// Configures custom experimental HTTP/2 setting.
     ///
     /// This setting is reserved for future use or experimental purposes.
@@ -1210,6 +1201,15 @@ impl Builder {
     ) -> &mut Self {
         self.settings
             .set_experimental_settings(experimental_settings);
+        self
+    }
+
+    /// Sets the order of settings parameters in the initial SETTINGS frame.
+    ///
+    /// This determines the order in which settings are sent during the HTTP/2 handshake.
+    /// Customizing the order may be useful for testing or protocol compliance.
+    pub fn settings_order(&mut self, order: SettingsOrder) -> &mut Self {
+        self.settings.set_settings_order(order);
         self
     }
 
